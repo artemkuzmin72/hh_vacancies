@@ -62,7 +62,7 @@ def user_interaction() -> None:
     load_dotenv()
     db_params = {
         'host': os.getenv('DB_HOST'),
-        'database': 'postgres',
+        'database': os.getenv('DB_NAME'),
         'user': os.getenv('DB_USER'),
         'password': os.getenv('DB_PASSWORD')
     }
@@ -94,12 +94,12 @@ def user_interaction() -> None:
             for company, title, salary_from, salary_to, currency, url in vacancies:
                 salary = ''
                 if salary_from or salary_to:
-                    salary = f'Зарплата {salary_from or '-'} - {salary_to or '-'} {currency}'
+                    salary = f"Зарплата {salary_from or '-'} - {salary_to or '-'} {currency}"
                 print(f'{company} | {title} | {salary} | {url}')
 
         elif value == '3':
             vacancies = db_manager.get_avg_salary()
-            print(f'Средняя зарплата: {.2}')
+            print(f'Средняя зарплата: {vacancies} руб.')
 
         elif value == '4':
             vacancies = db_manager.get_vacancies_with_higher_salary()
@@ -116,7 +116,7 @@ def user_interaction() -> None:
                     salary = f'Зарплата {salary_from or '-'} - {salary_to or '-'} {currency}'
                 print(f'{company} | {title} | {salary} | {url}')
 
-        elif value == '0':
+        elif value == '6':
             break
         else:
             print('Неверный ввод. Попробуйте снова.')

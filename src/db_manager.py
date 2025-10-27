@@ -1,5 +1,4 @@
 from typing import List, Optional
-
 import psycopg2
 
 
@@ -25,7 +24,7 @@ class DBManager:
                 LEFT JOIN vacancies ON employers.employer_id = vacancies.employer_id
                 GROUP BY employers.employer_id, employers.name, employers.industry
                 ORDER BY vacancies_count DESC
-            """
+                """
             )
             return cur.fetchall()
 
@@ -40,30 +39,38 @@ class DBManager:
                     vacancies.salary_from,
                     vacancies.salary_to,
                     vacancies.currency,
-                    vacancies_url AS vacancy_url
+                    vacancies.url AS vacancy_url
                 FROM vacancies
                 INNER JOIN employers ON vacancies.employer_id = employers.employer_id
                 ORDER BY company_name, vacancy_title
-            """
+                """
             )
             return cur.fetchall()
 
     def get_avg_salary(self) -> Optional[float]:
-        """Получение средней зарплаты по всем вакансиям"""
+        """Получение средней зарплаты по всем вакансиям в рублях"""
         with self.conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT
-                    AVG((COALESCE(vacancies.salary_from, vacancies.salary_to) +
-                    COALESCE(vacancies.salary_to, vacancies.salary_from))/2) AS average_salary
+                    ROUND(AVG(
+                        CASE
+                            WHEN salary_from IS NOT NULL AND salary_to IS NOT NULL 
+                                THEN (salary_from + salary_to) / 2.0
+                            WHEN salary_from IS NOT NULL 
+                                THEN salary_from
+                            WHEN salary_to IS NOT NULL 
+                                THEN salary_to
+                        END
+                    ), 2)
                 FROM vacancies
                 WHERE
-                    vacancies.salary_from IS NOT NULL OR
-                    vacancies.salary_to IS NOT NULL
-            """
+                    (salary_from IS NOT NULL OR salary_to IS NOT NULL)
+                    AND (currency = 'RUR' OR currency = 'rub' OR currency = 'RUB')
+                """
             )
             result = cur.fetchone()
-            return result[0] if result else  None
+            return result[0] if result and result[0] is not None else None
 
     def get_vacancies_with_higher_salary(self) -> List[tuple]:
         """Получение списка вакансий выше средней"""
@@ -84,12 +91,12 @@ class DBManager:
                 FROM vacancies
                 INNER JOIN employers ON vacancies.employer_id = employers.employer_id
                 WHERE
-                    (COALESCE(vacancies.salary_from, vacancies.salary_to) +
-                    COALESCE(vacancies.salary_to, vacancies.salary_from)) / 2 ) > %s
+                    ((COALESCE(vacancies.salary_from, vacancies.salary_to) +
+                      COALESCE(vacancies.salary_to, vacancies.salary_from)) / 2) > %s
                 ORDER BY
                     ((COALESCE(vacancies.salary_from, vacancies.salary_to) +
-                    COALESCE(vacancies.salary_to, vacancies.salary_from)) / 2 ) DESC
-            """,
+                      COALESCE(vacancies.salary_to, vacancies.salary_from)) / 2) DESC
+                """,
                 (avg_salary,),
             )
             return cur.fetchall()
@@ -105,13 +112,12 @@ class DBManager:
                     vacancies.salary_from,
                     vacancies.salary_to,
                     vacancies.currency,
-                    vacancies.url AS vacancies_url
+                    vacancies.url AS vacancy_url
                 FROM vacancies
                 INNER JOIN employers ON vacancies.employer_id = employers.employer_id
                 WHERE LOWER(vacancies.title) LIKE LOWER(%s)
                 ORDER BY company_name, vacancy_title
-            """,
+                """,
                 (f'%{keyword}%',),
             )
             return cur.fetchall()
-
